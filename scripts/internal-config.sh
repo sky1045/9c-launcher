@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ex
+set -e
 
 if [[ "$APV_SIGN_KEY_INTERNAL" = "" ]]; then
   echo "APV_SIGN_KEY_INTERNAL is not configured." > /dev/stderr
@@ -25,14 +25,10 @@ aws s3 cp s3://9c-artifacts/9c-launcher/$COMMIT_HASH/ package --recursive
 
 mkdir linux && tar -xvf package/Linux.tar.gz -C linux
 mkdir macos && tar -xvf package/MacOS.tar.gz -C macos
-unzip package/Windows.zip -d ./windows
+7zr x package/Windows.zip -o./windows/
 
 # new player
 player_commit_hash=$(git submodule status NineChronicles | awk '{print $1}')
-default_url_base=https://release.nine-chronicles.com/internal/v
-macos_url="${APV_MACOS_URL:-$default_url_base$APV_NO/player/$player_commit_hash/macOS.tar.gz}"
-linux_url="${APV_LINUX_URL:-$default_url_base$APV_NO/player/$player_commit_hash/Linux.tar.gz}"
-windows_url="${APV_WINDOWS_URL:-$default_url_base$APV_NO/player/$player_commit_hash/Windows.zip}"
 
 # sign new APV with APV_NO
 passphrase="$(LC_CTYPE=C tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 32 | head -n 1)"
@@ -41,9 +37,8 @@ key_id="$(planet key import --passphrase="$passphrase" "${APV_SIGN_KEY_INTERNAL%
 apv="$( \
   planet apv sign \
     --passphrase="$passphrase" \
-    --extra macOSBinaryUrl="$macos_url" \
-    --extra LinuxBinaryUrl="$linux_url" \
-    --extra WindowsBinaryUrl="$windows_url" \
+    --extra player=$player_commit_hash \
+    --extra launcher=$COMMIT_HASH \
     --extra timestamp="$(date --iso-8601=sec)" \
     "$key_id" \
     "$APV_NO"
@@ -59,11 +54,11 @@ cp config.json macos/Nine\ Chronicles.app/Contents/Resources/app/config.json
 rm config.json
 
 # upload(overwrite) to s3
-7zr a -r package/win.zip windows/*
-tar cvfz package/mac.tar.gz macos/*
-tar cvfz package/linux.tar.gz linux/*
+7zr a -r package/Windows.zip windows/*
+tar cvfz package/MacOS.tar.gz macos/*
+tar cvfz package/Linux.tar.gz linux/*
 
-aws s3 cp package/ s3://9c-release.planetariumhq.com/internal/$APV_NO/launcher/v1/ --recursive
-aws s3 cp package/ s3://9c-release.planetariumhq.com/internal/$APV_NO/launcher/$COMMIT_HASH/ --recursive
+aws s3 cp package/ s3://9c-release.planetariumhq.com/internal/v$APV_NO/launcher/v1/ --recursive
+aws s3 cp package/ s3://9c-release.planetariumhq.com/internal/v$APV_NO/launcher/$COMMIT_HASH/ --recursive
 
 rm -rf windows linux macos package
