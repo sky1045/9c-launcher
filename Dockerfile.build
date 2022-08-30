@@ -2,12 +2,15 @@ FROM --platform=linux/amd64 node:16.16.0-slim
 
 RUN mkdir /root/9c-launcher
 
+RUN mkdir /root/.config
+
 WORKDIR /root/9c-launcher
 
 RUN apt-get update && \
 	apt-get install -y \
 	curl \
 	git \
+	jq \
 	wget \
 	wine64 \
 	gnupg \
